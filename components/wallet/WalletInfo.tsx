@@ -11,7 +11,7 @@ import { useConnection } from '@solana/wallet-adapter-react';
 import { FC, useEffect, useState } from 'react';
 import {
   Connection,
-  PublicKey,
+  // Remove unused PublicKey import
   LAMPORTS_PER_SOL
 } from "@solana/web3.js";
 import toast from 'react-hot-toast';
