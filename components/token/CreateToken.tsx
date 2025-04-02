@@ -5,23 +5,24 @@
  * This component allows users to create new SPL tokens.
  * It handles token creation with proper validation and error handling.
  */
+// Import section
 import { FC, useState } from 'react';
 import { useWallet, useConnection } from '@solana/wallet-adapter-react';
-// Remove unused imports or use them properly
 import * as web3 from '@solana/web3.js';
 import * as token from '@solana/spl-token';
 import toast from 'react-hot-toast';
-import { getReliableConnection } from '@/utils/connection';
+// Remove or comment out unused import
+// import { getReliableConnection } from '@/utils/connection';
 
 export const CreateToken: FC = () => {
   const { publicKey, sendTransaction } = useWallet();
-  // We'll keep connection but use it properly
-  const { connection } = useConnection();
+  // Use underscore prefix for unused variables
+  const { connection: _connection } = useConnection();
   const [tokenName, setTokenName] = useState('');
   const [tokenSymbol, setTokenSymbol] = useState('');
   const [decimals, setDecimals] = useState('9');
   const [isLoading, setIsLoading] = useState(false);
-  const [network, _setNetwork] = useState('devnet'); // Use underscore for unused setter
+  const [network] = useState('devnet'); // Remove unused setter
   
   const getReliableConnection = (networkType: 'mainnet' | 'devnet') => {
     const endpoint = networkType === 'mainnet' 
