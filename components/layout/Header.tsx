@@ -2,23 +2,23 @@
 /**
  * Header Component
  * 
- * This component displays the application header with the app logo,
- * wallet connection status, and wallet connection button.
+ * This component displays the application header with logo and wallet connection button.
  */
 import React from 'react';
 import { useWallet } from '@solana/wallet-adapter-react';
-import { WalletConnect } from '@/components/wallet/WalletConnect';
-import { WalletMultiButton } from '@solana/wallet-adapter-react-ui';
+import { WalletConnect } from '../wallet/WalletConnect';
+import Link from 'next/link';
 
 const Header: React.FC = () => {
-  const { connected, publicKey } = useWallet();
+  // We'll remove the unused variables
+  const { } = useWallet();
 
   return (
     <header className="bg-[#17153B] border-b-2 border-black text-[#C8ACD6] shadow-sm">
       <div className=" px-4 py-4">
         <div className="flex items-center justify-between">
           <div className="flex items-center">
-            <a href="/" className="flex items-center">
+            <Link href="/" className="flex items-center">
               <svg
                 className="h-8 w-8 mr-2"
                 fill="none"
@@ -34,7 +34,7 @@ const Header: React.FC = () => {
                 />
               </svg>
               <span className=" font-bold text-xl">Solana Token App</span>
-            </a>
+            </Link>
           </div>
           
           <div className="flex items-center">
