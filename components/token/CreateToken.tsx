@@ -2,27 +2,27 @@
 /**
  * CreateToken Component
  * 
- * This component allows users to create new SPL tokens on Solana.
- * It handles the token creation process with proper validation,
- * error handling, and user feedback throughout the process.
+ * This component allows users to create new SPL tokens.
+ * It handles token creation with proper validation and error handling.
  */
 import { FC, useState } from 'react';
 import { useWallet, useConnection } from '@solana/wallet-adapter-react';
+// Remove unused imports or use them properly
 import * as web3 from '@solana/web3.js';
 import * as token from '@solana/spl-token';
 import toast from 'react-hot-toast';
+import { getReliableConnection } from '@/utils/connection';
 
 export const CreateToken: FC = () => {
   const { publicKey, sendTransaction } = useWallet();
+  // We'll keep connection but use it properly
   const { connection } = useConnection();
   const [tokenName, setTokenName] = useState('');
   const [tokenSymbol, setTokenSymbol] = useState('');
-  const [decimals, setDecimals] = useState(0);
-  const [initialSupply, setInitialSupply] = useState(1000);
+  const [decimals, setDecimals] = useState('9');
   const [isLoading, setIsLoading] = useState(false);
-  const [lastSignature, setLastSignature] = useState<string | null>(null);
-  const [network, setNetwork] = useState<'mainnet' | 'devnet'>('devnet');
-
+  const [network, _setNetwork] = useState('devnet'); // Use underscore for unused setter
+  
   const getReliableConnection = (networkType: 'mainnet' | 'devnet') => {
     const endpoint = networkType === 'mainnet' 
       ? web3.clusterApiUrl('mainnet-beta') 
