@@ -10,7 +10,8 @@ import { WalletMultiButton } from '@solana/wallet-adapter-react-ui';
 import { FC, useEffect, useState } from 'react';
 
 export const WalletConnect: FC = () => {
-  const { connected } = useWallet();
+  // Remove the unused connected variable
+  const { } = useWallet();
   // Add this state to prevent server/client mismatch
   const [mounted, setMounted] = useState(false);
 
