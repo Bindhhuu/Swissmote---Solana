@@ -6,10 +6,10 @@
  */
 import { FC, useEffect, useState } from 'react';
 import { useWallet, useConnection } from '@solana/wallet-adapter-react';
-import * as web3 from '@solana/web3.js';
+// Remove unused web3 import
 import * as token from '@solana/spl-token';
 import { getReliableConnection } from '@/utils/connection';
-import toast from 'react-hot-toast'; // Add this import for toast notifications
+import toast from 'react-hot-toast';
 
 interface TokenInfo {
   mint: string;
