@@ -19,6 +19,7 @@ export const MintToken: FC = () => {
   const [mintAddress, setMintAddress] = useState('');
   const [amount, setAmount] = useState('');
   const [isLoading, setIsLoading] = useState(false);
+  // We'll keep this state but use it properly
   const [decimals, setDecimals] = useState(9);
 
   const handleMintToken = async (e: React.FormEvent) => {
@@ -41,7 +42,8 @@ export const MintToken: FC = () => {
       let mintPubkey: web3.PublicKey;
       try {
         mintPubkey = new web3.PublicKey(mintAddress);
-      } catch (error) {
+      } catch (_) {
+        // Use underscore for unused variables
         toast.error('Invalid mint address format');
         return;
       }
