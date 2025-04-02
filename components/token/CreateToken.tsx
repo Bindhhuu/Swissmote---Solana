@@ -16,13 +16,14 @@ import toast from 'react-hot-toast';
 
 export const CreateToken: FC = () => {
   const { publicKey, sendTransaction } = useWallet();
-  // Remove the unused connection variable completely
   const { } = useConnection();
   const [tokenName, setTokenName] = useState('');
   const [tokenSymbol, setTokenSymbol] = useState('');
-  const [decimals, setDecimals] = useState('9');
+  const [decimals, setDecimals] = useState(9); // Change from string to number
   const [isLoading, setIsLoading] = useState(false);
-  const [network] = useState('devnet');
+  const [network] = useState<'devnet' | 'mainnet'>('devnet');
+  const [initialSupply, setInitialSupply] = useState(1000); // Add missing state
+  const [lastSignature, setLastSignature] = useState<string | null>(null); // Add missing state
   
   const getReliableConnection = (networkType: 'mainnet' | 'devnet') => {
     const endpoint = networkType === 'mainnet' 
