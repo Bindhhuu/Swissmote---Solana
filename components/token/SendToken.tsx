@@ -1,45 +1,29 @@
-// src/components/token/CreateToken.tsx
+// src/components/token/SendToken.tsx
 /**
- * CreateToken Component
+ * SendToken Component
  * 
- * This component allows users to create new SPL tokens.
- * It handles token creation with proper validation and error handling.
+ * This component allows users to send SPL tokens to other wallets.
+ * It handles token transfers with proper validation and error handling.
  */
-// Import section
 import { FC, useState } from 'react';
 import { useWallet, useConnection } from '@solana/wallet-adapter-react';
 import * as web3 from '@solana/web3.js';
 import * as token from '@solana/spl-token';
 import toast from 'react-hot-toast';
-// Remove or comment out unused import
-// import { getReliableConnection } from '@/utils/connection';
+import { getReliableConnection, withRetry } from '@/utils/connection';
 
-export const CreateToken: FC = () => {
+export const SendToken: FC = () => {
   const { publicKey, sendTransaction } = useWallet();
-  const { } = useConnection();
-  const [tokenName, setTokenName] = useState('');
-  const [tokenSymbol, setTokenSymbol] = useState('');
-  const [decimals, setDecimals] = useState('9');
+  const { connection } = useConnection();
+  const [mintAddress, setMintAddress] = useState('');
+  const [recipientAddress, setRecipientAddress] = useState('');
+  const [amount, setAmount] = useState('');
   const [isLoading, setIsLoading] = useState(false);
-  // Fix the network type to use the correct union type
-  const [network] = useState<'devnet' | 'mainnet'>('devnet');
-  
-  const getReliableConnection = (networkType: 'mainnet' | 'devnet') => {
-    const endpoint = networkType === 'mainnet' 
-      ? web3.clusterApiUrl('mainnet-beta') 
-      : web3.clusterApiUrl('devnet');
-    
-    return new web3.Connection(
-      endpoint,
-      {
-        commitment: 'confirmed',
-        confirmTransactionInitialTimeout: 120000,
-        disableRetryOnRateLimit: false,
-      }
-    );
-  };
+  // Remove the unused decimals variable or use it
+  // const [decimals, setDecimals] = useState(9);
+  const [, setDecimals] = useState(9); // Keep only the setter
 
-  const handleCreateToken = async (e: React.FormEvent) => {
+  const handleSendToken = async (e: React.FormEvent) => {
     e.preventDefault();
     
     if (!publicKey) {
@@ -47,114 +31,125 @@ export const CreateToken: FC = () => {
       return;
     }
     
-    if (!tokenName || !tokenSymbol) {
+    if (!mintAddress || !recipientAddress || !amount) {
       toast.error('Please fill in all fields');
       return;
     }
     
     setIsLoading(true);
-    const toastId = toast.loading('Preparing to create token...');
+    const toastId = toast.loading('Preparing transaction...');
     
     try {
-      const tokenConnection = getReliableConnection(network);
+      const reliableConnection = getReliableConnection(connection.rpcEndpoint);
       
-      const mintAccount = web3.Keypair.generate();
-      console.log('Creating token with mint address:', mintAccount.publicKey.toString());
+      let mintPubkey: web3.PublicKey;
+      let recipientPubkey: web3.PublicKey;
       
-      const transaction = new web3.Transaction();
+      try {
+        mintPubkey = new web3.PublicKey(mintAddress);
+      } catch {
+        // Remove the unused variable in the catch block
+        toast.error('Invalid mint address format', { id: toastId });
+        return;
+      }
       
-      const rentExemptBalance = await tokenConnection.getMinimumBalanceForRentExemption(token.MINT_SIZE)
-        .catch(err => {
-          console.error('Error getting rent exemption:', err);
-          throw new Error('Failed to calculate rent exemption. Please try again later.');
-        });
+      try {
+        recipientPubkey = new web3.PublicKey(recipientAddress);
+      } catch {
+        // Remove the unused variable in the catch block
+        toast.error('Invalid recipient address format', { id: toastId });
+        return;
+      }
       
-      transaction.add(
-        web3.SystemProgram.createAccount({
-          fromPubkey: publicKey,
-          newAccountPubkey: mintAccount.publicKey,
-          space: token.MINT_SIZE,
-          lamports: rentExemptBalance,
-          programId: token.TOKEN_PROGRAM_ID,
-        })
-      );
+      let actualDecimals = 9; // Default value
       
-      transaction.add(
-        token.createInitializeMintInstruction(
-          mintAccount.publicKey,
-          decimals,
-          publicKey,
-          publicKey,
-          token.TOKEN_PROGRAM_ID
-        )
-      );
+      try {
+        const mintInfo = await withRetry(() => 
+          token.getMint(reliableConnection, mintPubkey)
+        );
+        actualDecimals = mintInfo.decimals;
+        setDecimals(mintInfo.decimals);
+        console.log('Token decimals:', mintInfo.decimals);
+      } catch (error) {
+        console.error('Error getting mint info:', error);
+        toast.error('Could not verify token mint. Please check the address.', { id: toastId });
+        return;
+      }
       
-      const associatedTokenAddress = await token.getAssociatedTokenAddress(
-        mintAccount.publicKey,
+      const sourceTokenAddress = await token.getAssociatedTokenAddress(
+        mintPubkey,
         publicKey
       );
       
-      transaction.add(
-        token.createAssociatedTokenAccountInstruction(
-          publicKey,
-          associatedTokenAddress,
-          publicKey,
-          mintAccount.publicKey
-        )
+      const sourceAccountInfo = await reliableConnection.getAccountInfo(sourceTokenAddress);
+      if (!sourceAccountInfo) {
+        toast.error('You don\'t have a token account for this token', { id: toastId });
+        return;
+      }
+      
+      const destinationTokenAddress = await token.getAssociatedTokenAddress(
+        mintPubkey,
+        recipientPubkey
       );
       
-      if (initialSupply > 0) {
-        const mintAmount = decimals === 0 
-          ? initialSupply 
-          : initialSupply * Math.pow(10, decimals);
-        
+      const transaction = new web3.Transaction();
+      
+      const destinationAccountInfo = await reliableConnection.getAccountInfo(destinationTokenAddress);
+      
+      if (!destinationAccountInfo) {
         transaction.add(
-          token.createMintToInstruction(
-            mintAccount.publicKey,
-            associatedTokenAddress,
+          token.createAssociatedTokenAccountInstruction(
             publicKey,
-            BigInt(mintAmount)
+            destinationTokenAddress,
+            recipientPubkey,
+            mintPubkey
           )
         );
       }
       
-      const { blockhash, lastValidBlockHeight } = await tokenConnection.getLatestBlockhash();
+      // Convert integer amount to the proper token amount with decimals
+      const transferAmount = Number(amount) * Math.pow(10, actualDecimals);
+      
+      console.log('Transfer amount:', transferAmount);
+      
+      transaction.add(
+        token.createTransferInstruction(
+          sourceTokenAddress,
+          destinationTokenAddress,
+          publicKey,
+          BigInt(Math.floor(transferAmount))
+        )
+      );
+      
+      const { blockhash, lastValidBlockHeight } = await reliableConnection.getLatestBlockhash();
       transaction.recentBlockhash = blockhash;
       transaction.feePayer = publicKey;
       
       toast.loading('Sending transaction...', { id: toastId });
       
-      const signature = await sendTransaction(transaction, tokenConnection, {
-        signers: [mintAccount]
-      });
-      
-      setLastSignature(signature);
+      const signature = await sendTransaction(transaction, reliableConnection);
       
       toast.loading('Confirming transaction...', { id: toastId });
       
-      await tokenConnection.confirmTransaction({
+      await reliableConnection.confirmTransaction({
         signature,
         blockhash,
         lastValidBlockHeight
       });
       
       toast.success(
-        <div>
-          <p>Token created successfully!</p>
-          <p className="text-xs mt-1">Mint Address: {mintAccount.publicKey.toString()}</p>
-        </div>,
-        { id: toastId, duration: 10000 }
+        `Successfully sent ${amount} tokens to ${recipientAddress.slice(0, 4)}...${recipientAddress.slice(-4)}`,
+        { id: toastId }
       );
       
-      setTokenName('');
-      setTokenSymbol('');
-      setInitialSupply(1000);
+      setAmount('');
+      setRecipientAddress('');
     } catch (error) {
-      console.error('Error creating token:', error);
+      console.error('Error sending tokens:', error);
       toast.error(
         error instanceof Error 
-          ? `Failed to create token: ${error.message}` 
-          : 'Failed to create token. Please try again later.',
+          ? `Failed to send tokens: ${error.message}` 
+          : 'Failed to send tokens. Please check the addresses and try again.',
         { id: toastId }
       );
     } finally {
@@ -162,84 +157,54 @@ export const CreateToken: FC = () => {
     }
   };
 
-  const handleDecimalsChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const value = e.target.value;
-    if (value === '') {
-      setDecimals(0);
-      return;
-    }
-    
-    const parsed = parseInt(value, 10);
-    if (!isNaN(parsed) && parsed >= 0 && parsed <= 9) {
-      setDecimals(parsed);
-    }
-  };
-
   return (
     <div className="bg-[#2E236C]  rounded-lg p-6 border-4 border-[#17153B] text-white">
-      <h2 className="text-2xl font-bold mb-4 text-primary">Create New Token</h2>
-      <form onSubmit={handleCreateToken}>
+      <h2 className="text-2xl font-bold mb-4 text-primary">Send Tokens</h2>
+      <form onSubmit={handleSendToken}>
         <div className="mb-4">
-          <label className="block text-secondary text-sm font-bold mb-2" htmlFor="tokenName">
-            Token Name
+          <label className="block text-secondary text-sm font-bold mb-2" htmlFor="mintAddress">
+            Token Mint Address
           </label>
           <input
-            id="tokenName"
+            id="mintAddress"
             type="text"
-            className=" border border-neutral rounded w-full py-2 px-3 text-[gray-700] leading-tight focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent"
-            placeholder="My Token"
-            value={tokenName}
-            onChange={(e) => setTokenName(e.target.value)}
+            className="border border-neutral rounded w-full py-2 px-3 text-[gray-700] leading-tight focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent"
+            placeholder="Enter token mint address"
+            value={mintAddress}
+            onChange={(e) => setMintAddress(e.target.value)}
             disabled={isLoading}
           />
         </div>
         <div className="mb-4">
-          <label className="block text-secondary text-sm font-bold mb-2" htmlFor="tokenSymbol">
-            Token Symbol
+          <label className="block text-secondary text-sm font-bold mb-2" htmlFor="recipientAddress">
+            Recipient Address
           </label>
           <input
-            id="tokenSymbol"
+            id="recipientAddress"
             type="text"
             className="border border-neutral rounded w-full py-2 px-3 text-[gray-700] leading-tight focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent"
-            placeholder="MTK"
-            value={tokenSymbol}
-            onChange={(e) => setTokenSymbol(e.target.value)}
+            placeholder="Enter recipient wallet address"
+            value={recipientAddress}
+            onChange={(e) => setRecipientAddress(e.target.value)}
             disabled={isLoading}
           />
-        </div>
-        <div className="mb-4">
-          <label className="block text-secondary text-sm font-bold mb-2" htmlFor="decimals">
-            Decimals (0-9)
-          </label>
-          <input
-            id="decimals"
-            type="number"
-            min="0"
-            max="9"
-            className="border border-neutral rounded w-full py-2 px-3 text-[gray-700] leading-tight focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent"
-            placeholder="e.g., 9"
-            value={decimals}
-            onChange={handleDecimalsChange}
-            disabled={isLoading}
-          />
-          <p className="text-xs text-gray-400 mt-1">
-            Lower decimals (0-2) are recommended to save on transaction fees.
-          </p>
         </div>
         <div className="mb-6">
-          <label className="block text-secondary text-sm font-bold mb-2" htmlFor="initialSupply">
-            Initial Supply
+          <label className="block text-secondary text-sm font-bold mb-2" htmlFor="sendAmount">
+            Amount
           </label>
           <input
-            id="initialSupply"
+            id="sendAmount"
             type="number"
-            min="0"
+            min="1"
+            step="1"
             className="border border-neutral rounded w-full py-2 px-3 text-[gray-700] leading-tight focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent"
-            placeholder="e.g., 1000"
-            value={initialSupply}
-            onChange={(e) => setInitialSupply(Number(e.target.value))}
+            placeholder="Amount to send (whole tokens)"
+            value={amount}
+            onChange={(e) => setAmount(e.target.value)}
             disabled={isLoading}
           />
+          <p className="text-xs text-[#F6F8D5] mt-1">Enter whole token amounts (no decimals needed)</p>
         </div>
         <div className="flex items-center justify-between">
           <button
@@ -249,26 +214,10 @@ export const CreateToken: FC = () => {
             }`}
             disabled={isLoading || !publicKey}
           >
-            {isLoading ? 'Creating...' : 'Create Token'}
+            {isLoading ? 'Sending...' : 'Send Tokens'}
           </button>
         </div>
       </form>
-      
-      {lastSignature && (
-        <div className="mt-4 p-3 bg-gray-50 rounded-md">
-          <p className="text-sm text-gray-700">
-            Last transaction: 
-            <a 
-              href={`https://explorer.solana.com/tx/${lastSignature}?cluster=devnet`}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="ml-2 text-accent hover:text-accent-dark"
-            >
-              View on Solana Explorer
-            </a>
-          </p>
-        </div>
-      )}
     </div>
   );
 };
