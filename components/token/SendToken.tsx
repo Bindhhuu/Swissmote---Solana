@@ -1,9 +1,9 @@
+// src/components/token/SendToken.tsx
 /**
  * SendToken Component
  * 
  * This component allows users to send SPL tokens to other wallets.
- * It handles token transfers with proper validation, error handling,
- * and user feedback throughout the process.
+ * It handles token transfers with proper validation and error handling.
  */
 import { FC, useState } from 'react';
 import { useWallet, useConnection } from '@solana/wallet-adapter-react';
@@ -19,6 +19,7 @@ export const SendToken: FC = () => {
   const [recipientAddress, setRecipientAddress] = useState('');
   const [amount, setAmount] = useState('');
   const [isLoading, setIsLoading] = useState(false);
+  // We'll keep this state but use it properly
   const [decimals, setDecimals] = useState(9);
 
   const handleSendToken = async (e: React.FormEvent) => {
@@ -45,14 +46,16 @@ export const SendToken: FC = () => {
       
       try {
         mintPubkey = new web3.PublicKey(mintAddress);
-      } catch (error) {
+      } catch (_) {
+        // Use underscore for unused variables
         toast.error('Invalid mint address format', { id: toastId });
         return;
       }
       
       try {
         recipientPubkey = new web3.PublicKey(recipientAddress);
-      } catch (error) {
+      } catch (_) {
+        // Use underscore for unused variables
         toast.error('Invalid recipient address format', { id: toastId });
         return;
       }
