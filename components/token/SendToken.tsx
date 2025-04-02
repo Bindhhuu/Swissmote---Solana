@@ -19,8 +19,9 @@ export const SendToken: FC = () => {
   const [recipientAddress, setRecipientAddress] = useState('');
   const [amount, setAmount] = useState('');
   const [isLoading, setIsLoading] = useState(false);
-  // We'll keep this state but use it properly
-  const [decimals, setDecimals] = useState(9);
+  // Remove the unused decimals variable or use it
+  // const [decimals, setDecimals] = useState(9);
+  const [, setDecimals] = useState(9); // Keep only the setter
 
   const handleSendToken = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -46,16 +47,16 @@ export const SendToken: FC = () => {
       
       try {
         mintPubkey = new web3.PublicKey(mintAddress);
-      } catch (_) {
-        // Use underscore for unused variables
+      } catch {
+        // Remove the unused variable in the catch block
         toast.error('Invalid mint address format', { id: toastId });
         return;
       }
       
       try {
         recipientPubkey = new web3.PublicKey(recipientAddress);
-      } catch (_) {
-        // Use underscore for unused variables
+      } catch {
+        // Remove the unused variable in the catch block
         toast.error('Invalid recipient address format', { id: toastId });
         return;
       }
